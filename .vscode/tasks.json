@@ -6,10 +6,11 @@
             "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
             "args": [
                 "-fdiagnostics-color=always",
+                "-std=c++20",
                 "-g",
-                "${file}",
+                "*.cpp",
                 "-o",
-                "${fileDirname}\\${fileBasenameNoExtension}.exe"
+                "${fileDirname}\\main.exe"
             ],
             "options": {
                 "cwd": "${fileDirname}"
