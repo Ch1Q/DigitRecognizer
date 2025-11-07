@@ -106,6 +106,8 @@ struct FileHeader
 
 struct Sample
 {
+    size_t featureSize;
+    size_t labelSize;
     std::vector<double> features;
     std::vector<double> labels;
 };
@@ -183,3 +185,5 @@ public:
 };
 
 void normalInitSynapses(std::vector<Synapse> &syns);
+
+bool loadSamples(std::string path, std::vector<Sample> &samples);

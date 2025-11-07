@@ -6,7 +6,6 @@
 #include <numeric>
 // bool net::loadModel(std::string)
 // {
-//     // std::cout<<"CialloWorld";
 //     std::fstream file("../data/debug.csv");
 //     if (!file.is_open())
 //         std::cout << "file not open" << std::endl;
@@ -237,4 +236,97 @@ void normalInitSynapses(std::vector<Synapse> &syns)
         s.weight = dist(gen);
         s.bias = dist(gen); // bias 通常初始化为 0，或单独处理
     }
+}
+
+bool loadSamples(std::string path, std::vector<Sample> &samples)
+{
+    std::fstream file(path);
+    if (!file.is_open())
+    {
+        std::cout << "samples file not open" << std::endl;
+        return 0;
+    }
+    else
+    {
+        std::vector<std::string> fileLines;
+        std::string line;
+        while (std::getline(file, line))
+        {
+            if (!line.empty())
+            {
+                fileLines.push_back(line);
+            }
+            else
+                return 0;
+        }
+        if (!fileLines.empty())
+        {
+            samples.resize(fileLines.size());
+            std::string token;
+            std::vector<std::string> tokensOfOne;
+            for (int i = 0; i < fileLines.size(); i++)
+            {
+                std::istringstream iss(fileLines.at(i));
+                while (iss >> token)
+                {
+                    tokensOfOne.push_back(token);
+                }
+                samples.at(i).labels.resize(10);
+                for (int k = 0; k < 10; k++)
+                {
+                    if (!tokensOfOne.empty())
+                    {
+                        token = tokensOfOne.back();
+                        tokensOfOne.pop_back();
+                    }
+                    else
+                        return 0;
+                    double num = 0;
+                    try
+                    {
+                        num = std::stod(token);
+                    }
+                    catch (const std::invalid_argument &e)
+                    {
+                        std::cerr << "stod无效参数: " << e.what() << std::endl;
+                    }
+                    catch (const std::out_of_range &e)
+                    {
+                        std::cerr << "stod超出范围: " << e.what() << std::endl;
+                    }
+                    samples.at(i).labels.at(9 - k) = num;
+                }
+                if (!tokensOfOne.empty())
+                {
+                    samples.at(i).features.resize(tokensOfOne.size());
+                    for (int j = 0; j < tokensOfOne.size(); j++)
+                    {
+                        samples.at(i).features.resize(tokensOfOne.size());
+                        token = tokensOfOne.at(j);
+                        double num;
+                        try
+                        {
+                            num = std::stod(token);
+                        }
+                        catch (const std::invalid_argument &e)
+                        {
+                            std::cerr << "stod无效参数: " << e.what() << std::endl;
+                        }
+                        catch (const std::out_of_range &e)
+                        {
+                            std::cerr << "stod超出范围: " << e.what() << std::endl;
+                        }
+                        samples.at(i).features.at(j) = num;
+                    }
+                }
+                else
+                    return 0;
+
+                tokensOfOne.clear();
+            }
+        }
+        else
+            return 0;
+    }
+    return 1;
 }
