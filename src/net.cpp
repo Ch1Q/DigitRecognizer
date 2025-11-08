@@ -144,23 +144,34 @@ void DenseLink::normalInitSynapses()
 
 Network::Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output)
 {
-    addLayer("inputLayer", input);
-    addLayer("outputLayer", output);
+    addLayer(input);
+    addLayer(output);
 }
 
-void Network::addLayer(std::string name, std::shared_ptr<Layer> lyr)
+void Network::addLayer(std::shared_ptr<Layer> layer)
 {
-    layers.insert(name, lyr);
+    auto it = layers.end() - 1;
+    layers.insert(it, layer);
 }
 
-void Network::addLink(std::shared_ptr<Link> lnk)
+void Network::addLink(std::shared_ptr<Link> link)
 {
-    links.push_back(lnk);
+    links.push_back(link);
 }
 
-bool Network::predict(const Sample &smp)
+Sample Network::predict(const Sample &sample)
 {
-    if (smp.features.size() != layers.find_value("input"))
+    if (sample.features.size() != layers.front()->size())
+    {
+        std::cout << "predict Error: size don't match" << std::endl;
+        return Sample();
+    }
+    Layer &input(*layers.at(0));
+    for (int i = 0; i < input.size(); i++)
+    {
+        input.neurons.at(i).value = sample.features.at(i);
+    }
+    notCompleteYet
 }
 
 //
@@ -170,7 +181,7 @@ bool Network::predict(const Sample &smp)
 //
 //
 //
-void Network::saveModel(const std::string &filename)
+/*void Network::saveModel(const std::string &filename)
 {
     // 1. 处理文件名：确保以.nll结尾
     std::string final_filename = filename;
@@ -197,7 +208,7 @@ void Network::saveModel(const std::string &filename)
     ofs.write(reinterpret_cast<const char *>(&header), sizeof(header));
 
     // 4. 写入所有层信息（名称+形状）
-    for (const auto &[name, layer] : layers)
+    for (const auto &lyr: layers)
     {
         // 写入层名称（长度+内容）
         uint32_t name_len = static_cast<uint32_t>(name.size());
@@ -205,7 +216,7 @@ void Network::saveModel(const std::string &filename)
         ofs.write(name.c_str(), name_len);
 
         // 写入层形状（长度+维度数组）
-        const auto &shape = layer->getShape();
+        const auto &shape = lyr->getShape();
         uint32_t shape_len = static_cast<uint32_t>(shape.size());
         ofs.write(reinterpret_cast<const char *>(&shape_len), sizeof(shape_len));
         for (size_t dim : shape)
@@ -247,6 +258,8 @@ void Network::saveModel(const std::string &filename)
     ofs.close();
     std::cout << "模型已保存到: " << final_filename << std::endl;
 }
+
+*/
 
 void normalInitSynapses(std::vector<Synapse> &syns)
 {
