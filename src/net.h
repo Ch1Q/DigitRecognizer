@@ -7,7 +7,6 @@
 #include <memory>
 #include <immintrin.h>
 #include <optional>
-#pragma pack(push, 1)
 
 template <typename KeyType, typename ValueType>
 class BiDirectionalMap
@@ -95,6 +94,7 @@ public:
     auto end() const noexcept { return key_to_value_.end(); }
 };
 
+#pragma pack(push, 1)
 struct FileHeader
 {
     uint32_t magic;      // 魔数：0xDEADBEEF（自定义）
@@ -104,12 +104,46 @@ struct FileHeader
 };
 #pragma pack(pop) // 恢复默认对齐
 
+double sigmoid(double x);
+
+double sigmoidDeri(double x);
+
+double linear(double x);
+
+double linearDeri(double x);
+
+const std::unordered_map<std::string, std::function<double(double)>> activateFunc =
+    {
+        {"sigmoid", sigmoid},
+        {"linear", linear}};
+
+const std::unordered_map<std::string, std::function<double(double)>> activateDeriFunc =
+    {
+        {"sigmoidDeri", sigmoidDeri},
+        {"linearDeri", linearDeri}};
+
 struct Sample
 {
-    size_t featureSize;
-    size_t labelSize;
     std::vector<double> features;
     std::vector<double> labels;
+};
+
+class SampleSet
+{
+
+    std::vector<Sample> samples;
+
+public:
+    SampleSet(size_t featureSize_, size_t labelSize_);
+    SampleSet(size_t featureSize_, size_t labelSize_, size_t sampleSize);
+    void resize(size_t size_);
+    size_t size();
+    bool push_back(Sample sample);
+    void clear();
+    void reserve(size_t size);
+    const Sample at(size_t);
+    const size_t featureSize;
+    const size_t labelSize;
 };
 
 class Nueron
@@ -146,17 +180,19 @@ public:
 
 class Link
 {
-public:
+protected:
     std::shared_ptr<Layer> sourceLayer;
     std::shared_ptr<Layer> targetLayer;
-    std::vector<Synapse> synapses;
-    std::function<double(double)> activate;
+    std::vector<Synapse> m_synapses;
+    std::string m_activate;
     virtual void initSynapses();
 
-    Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::function<double(double)> atv = [](double v)
-                                                                 { return v; });
+public:
+    Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti = "linear");
     std::shared_ptr<Layer> source();
     std::shared_ptr<Layer> target();
+    const std::vector<Synapse> synapses();
+    const std::string activate();
     virtual ~Link();
 };
 
@@ -166,24 +202,27 @@ class DenseLink : public Link
     void initSynapses() override;
 
 public:
-    DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::function<double(double)> atv = [](double v)
-                                                                      { return v; });
+    DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti = "linear");
     void normalInitSynapses();
 };
 
 class Network
 {
-public:
+
     BiDirectionalMap<std::string, std::shared_ptr<Layer>> layers;
     std::vector<std::shared_ptr<Link>> links;
 
+public:
     Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output);
-    void addLayer(std::string name, std::shared_ptr<Layer> lyr);
-    void addLink(std::shared_ptr<Link> lnk);
-    void saveModel(const std::string &file);
-    void loadModel(const std::string &file);
+    bool addLayer(std::string name, std::shared_ptr<Layer> lyr);
+    bool addLink(std::shared_ptr<Link> lnk);
+    bool saveModel(const std::string &file);
+    // void loadModel(const std::string &file);
+    bool predict(const Sample &smp);
 };
 
 void normalInitSynapses(std::vector<Synapse> &syns);
 
-bool loadSamples(std::string path, std::vector<Sample> &samples);
+bool loadSamples(std::string path, SampleSet &samples);
+
+void printSampleSet(SampleSet sampleSet);

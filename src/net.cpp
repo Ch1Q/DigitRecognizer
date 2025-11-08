@@ -4,56 +4,59 @@
 #include <fstream>
 #include <algorithm>
 #include <numeric>
-// bool net::loadModel(std::string)
-// {
-//     std::fstream file("../data/debug.csv");
-//     if (!file.is_open())
-//         std::cout << "file not open" << std::endl;
-//     else
-//     {
-//         std::cout << "file is opened" << std::endl;
-//         std::vector<std::string> fileLines;
-//         std::vector<std::vector<std::string>> tokens;
-//         std::string line;
-//         while (std::getline(file, line))
-//         {
-//             if (!line.empty())
-//             {
-//                 fileLines.push_back(line);
-//             }
-//         }
-//         if (!fileLines.empty())
-//         {
-//             std::cout << "fileLines Length: " << fileLines.size() << std::endl;
-//             std::istringstream iss(fileLines.front());
-//             std::string token;
-//             std::vector<std::string> tokensOfOne;
-//             while (iss >> token)
-//             {
-//                 tokensOfOne.push_back(token);
-//             }
-//             tokens.push_back(tokensOfOne);
-//             if ((!tokens.empty()) && (!tokens.front().empty()))
-//                 std::cout << "string token: " << tokens.front().front() << std::endl;
-//             int num;
-//             try
-//             {
-//                 num = std::stod(tokens.front().front());
-//             }
-//             catch (const std::invalid_argument &e)
-//             {
-//                 std::cerr << "stod无效参数: " << e.what() << std::endl;
-//             }
-//             catch (const std::out_of_range &e)
-//             {
-//                 std::cerr << "stod超出范围: " << e.what() << std::endl;
-//             }
-//             std::cout << "num token: " << num << std::endl;
-//         }
-//         else
-//             std::cout << "fileLines empty" << std::endl;
-//     }
-// }
+
+SampleSet::SampleSet(size_t featureSize_, size_t labelSize_) : featureSize(featureSize_), labelSize(labelSize_)
+{
+}
+
+SampleSet::SampleSet(size_t featureSize_, size_t labelSize_, size_t sampleSize) : featureSize(featureSize_), labelSize(labelSize_)
+{
+    samples.resize(sampleSize);
+}
+
+void SampleSet::resize(size_t size)
+{
+    samples.resize(size);
+}
+
+size_t SampleSet::size()
+{
+    return samples.size();
+}
+
+bool SampleSet::push_back(Sample sample_)
+{
+    if (sample_.features.size() == featureSize && sample_.labels.size() == labelSize)
+    {
+        samples.push_back(sample_);
+        return 1;
+    }
+    else
+    {
+        std::cout << "Error: sample's Size didn't match the set" << std::endl;
+        return 0;
+    }
+}
+
+void SampleSet::clear()
+{
+    samples.clear();
+}
+
+void SampleSet::reserve(size_t size)
+{
+    samples.reserve(size);
+}
+
+const Sample SampleSet::at(size_t size)
+{
+    if (size >= samples.size())
+    {
+        std::cout << "Sample.at Error: " << "out of limit size: " << samples.size();
+        return Sample();
+    }
+    return samples.at(size);
+}
 
 void Layer::initStrides(std::vector<size_t> shp)
 {
@@ -85,7 +88,7 @@ std::vector<size_t> Layer::getShape()
     return shape;
 }
 
-Link::Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::function<double(double)> atv) : sourceLayer(src), targetLayer(tgt)
+Link::Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti) : sourceLayer(src), targetLayer(tgt), m_activate(acti)
 {
 }
 
@@ -107,7 +110,15 @@ std::shared_ptr<Layer> Link::target()
     return targetLayer;
 }
 
-DenseLink::DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::function<double(double)> atv) : Link(src, tgt, atv)
+const std::vector<Synapse> Link::synapses()
+{
+    return m_synapses;
+}
+const std::string Link::activate()
+{
+    return m_activate;
+}
+DenseLink::DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti) : Link(src, tgt, acti)
 {
     initSynapses();
 }
@@ -115,20 +126,20 @@ DenseLink::DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std
 void DenseLink::initSynapses()
 {
     size_t sy_sz = sourceLayer->size() * targetLayer->size();
-    synapses.resize(sy_sz);
+    m_synapses.resize(sy_sz);
     for (size_t j = 0; j < targetLayer->size(); j++)
     {
         for (size_t i = 0; i < sourceLayer->size(); i++)
         {
-            synapses.at(j + i * targetLayer->size()).fromIdx = j;
-            synapses.at(j + i * targetLayer->size()).toIdx = i;
+            m_synapses.at(j + i * targetLayer->size()).fromIdx = j;
+            m_synapses.at(j + i * targetLayer->size()).toIdx = i;
         }
     }
 }
 
 void DenseLink::normalInitSynapses()
 {
-    ::normalInitSynapses(synapses);
+    ::normalInitSynapses(m_synapses);
 }
 
 Network::Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output)
@@ -147,6 +158,18 @@ void Network::addLink(std::shared_ptr<Link> lnk)
     links.push_back(lnk);
 }
 
+bool Network::predict(const Sample &smp)
+{
+    if (smp.features.size() != layers.find_value("input"))
+}
+
+//
+//
+//
+//
+//
+//
+//
 void Network::saveModel(const std::string &filename)
 {
     // 1. 处理文件名：确保以.nll结尾
@@ -197,7 +220,7 @@ void Network::saveModel(const std::string &filename)
         // 写入链接头部（原逻辑不变：源/目标/激活函数）
         ofs << "[Link:src=" << *layers.find_key(links[i]->source()) << ",tgt=" << *layers.find_key(links[i]->target())
             << ",activation="
-            //<< links[i]->getActivationString()
+            << links[i]->activate()
             << "]\n";
         ofs
             << "Type=Dense\n"; // 标记为全连接层（原逻辑不变）
@@ -208,7 +231,7 @@ void Network::saveModel(const std::string &filename)
         ofs
             << "Synapses=  // 标记突触列表开始\n";
         // 遍历每个突触，写入原始字段（fromIdx、toIdx、weight、bias）
-        for (const auto &syn : links[i]->synapses)
+        for (const auto &syn : links[i]->synapses())
         {
             ofs << syn.fromIdx << "," // 源神经元索引
                 << syn.toIdx << ","   // 目标神经元索引
@@ -238,95 +261,171 @@ void normalInitSynapses(std::vector<Synapse> &syns)
     }
 }
 
-bool loadSamples(std::string path, std::vector<Sample> &samples)
+bool loadSamples(std::string path, SampleSet &samples)
 {
     std::fstream file(path);
     if (!file.is_open())
     {
-        std::cout << "samples file not open" << std::endl;
+        std::cout << "loadingSamplesError: " << "couldn't open file " << path << std::endl;
         return 0;
     }
+    samples.clear();
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.empty())
+            continue;
+        std::stringstream ss(line);
+        std::vector<std::string> tokens;
+        std::string token;
+        while (ss >> token)
+        {
+            tokens.push_back(token);
+        }
+        if (tokens.size() != samples.featureSize + samples.labelSize)
+            continue;
+        std::vector<double> numTokens;
+        {
+            bool errorFlag = 0;
+            for (int i = 0; i < samples.featureSize + samples.labelSize; i++)
+            {
+                try
+                {
+                    numTokens.push_back(std::stod(tokens.at(i)));
+                }
+                catch (const std::invalid_argument &e)
+                {
+                    std::cerr << "无效参数: " << e.what() << std::endl;
+                    errorFlag = 1;
+                    break;
+                }
+                catch (const std::out_of_range &e)
+                {
+                    std::cerr << "超出范围: " << e.what() << std::endl;
+                    errorFlag = 1;
+                    break;
+                }
+            }
+            if (errorFlag)
+                continue;
+        }
+        Sample sp;
+        sp.features = std::vector<double>(numTokens.begin(), numTokens.begin() + samples.featureSize);
+        sp.labels = std::vector<double>(numTokens.begin() + samples.featureSize, numTokens.end());
+        samples.push_back(sp);
+    }
+    if (samples.size())
+        return 1;
     else
     {
-        std::vector<std::string> fileLines;
-        std::string line;
-        while (std::getline(file, line))
+        std::cout << "file: " << path << " has no line match sample" << std::endl;
+        return 0;
+    }
+}
+
+void printSampleSet(SampleSet sampleSet)
+{
+    if (sampleSet.size() <= 20)
+        for (int i = 0; i < sampleSet.size(); i++)
         {
-            if (!line.empty())
+            if (sampleSet.featureSize > 30)
             {
-                fileLines.push_back(line);
+                std::cout << "features: ";
+                for (int j = 0; j < 30; j++)
+                {
+                    std::cout << sampleSet.at(i).features.at(j) << " ";
+                }
+                std::cout << "... ";
             }
             else
-                return 0;
-        }
-        if (!fileLines.empty())
-        {
-            samples.resize(fileLines.size());
-            std::string token;
-            std::vector<std::string> tokensOfOne;
-            for (int i = 0; i < fileLines.size(); i++)
             {
-                std::istringstream iss(fileLines.at(i));
-                while (iss >> token)
+                std::cout << "features: ";
+                for (int j = 0; j < sampleSet.featureSize; j++)
                 {
-                    tokensOfOne.push_back(token);
+                    std::cout << sampleSet.at(i).features.at(j) << " ";
                 }
-                samples.at(i).labels.resize(10);
-                for (int k = 0; k < 10; k++)
-                {
-                    if (!tokensOfOne.empty())
-                    {
-                        token = tokensOfOne.back();
-                        tokensOfOne.pop_back();
-                    }
-                    else
-                        return 0;
-                    double num = 0;
-                    try
-                    {
-                        num = std::stod(token);
-                    }
-                    catch (const std::invalid_argument &e)
-                    {
-                        std::cerr << "stod无效参数: " << e.what() << std::endl;
-                    }
-                    catch (const std::out_of_range &e)
-                    {
-                        std::cerr << "stod超出范围: " << e.what() << std::endl;
-                    }
-                    samples.at(i).labels.at(9 - k) = num;
-                }
-                if (!tokensOfOne.empty())
-                {
-                    samples.at(i).features.resize(tokensOfOne.size());
-                    for (int j = 0; j < tokensOfOne.size(); j++)
-                    {
-                        samples.at(i).features.resize(tokensOfOne.size());
-                        token = tokensOfOne.at(j);
-                        double num;
-                        try
-                        {
-                            num = std::stod(token);
-                        }
-                        catch (const std::invalid_argument &e)
-                        {
-                            std::cerr << "stod无效参数: " << e.what() << std::endl;
-                        }
-                        catch (const std::out_of_range &e)
-                        {
-                            std::cerr << "stod超出范围: " << e.what() << std::endl;
-                        }
-                        samples.at(i).features.at(j) = num;
-                    }
-                }
-                else
-                    return 0;
-
-                tokensOfOne.clear();
             }
+            if (sampleSet.labelSize > 10)
+            {
+                std::cout << "labels: ";
+                for (int j = 0; j < 10; j++)
+                {
+                    std::cout << sampleSet.at(i).labels.at(j) << " ";
+                }
+                std::cout << "... ";
+            }
+            else
+            {
+                std::cout << "labels: ";
+                for (int j = 0; j < sampleSet.labelSize; j++)
+                {
+                    std::cout << sampleSet.at(i).labels.at(j) << " ";
+                }
+            }
+            std::cout << std::endl;
         }
-        else
-            return 0;
+    else
+    {
+        for (int i = 0; i < 20; i++)
+        {
+            if (sampleSet.featureSize > 30)
+            {
+                std::cout << "features: ";
+                for (int j = 0; j < 30; j++)
+                {
+                    std::cout << sampleSet.at(i).features.at(j) << " ";
+                }
+                std::cout << "... ";
+            }
+            else
+            {
+                std::cout << "features: ";
+                for (int j = 0; j < sampleSet.featureSize; j++)
+                {
+                    std::cout << sampleSet.at(i).features.at(j) << " ";
+                }
+            }
+            if (sampleSet.labelSize > 10)
+            {
+                std::cout << "labels: ";
+                for (int j = 0; j < 10; j++)
+                {
+                    std::cout << sampleSet.at(i).labels.at(j) << " ";
+                }
+                std::cout << "... ";
+            }
+            else
+            {
+                std::cout << "labels: ";
+                for (int j = 0; j < sampleSet.labelSize; j++)
+                {
+                    std::cout << sampleSet.at(i).labels.at(j) << " ";
+                }
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+        for (int k = 0; k < 3; k++)
+            std::cout << '.' << std::endl;
     }
-    return 1;
+}
+
+double sigmoid(double x)
+{
+    return 1.0 / (1.0 + std::exp(-x));
+}
+
+double sigmoidDeri(double x)
+{
+    return x * (1.0 - 1.0 / (1.0 + std::exp(-x)));
+}
+
+double linear(double x)
+{
+    return x;
+}
+
+double linearDeri(double x)
+{
+    return 0;
 }
