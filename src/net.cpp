@@ -69,7 +69,7 @@ void Layer::initStrides(std::vector<size_t> shp)
     }
 }
 
-Layer::Layer(std::vector<size_t> shp)
+Layer::Layer(std::vector<size_t> shp, std::string activate) : m_activate(activate)
 {
     shape = shp;
     initStrides(shp);
@@ -88,7 +88,7 @@ std::vector<size_t> Layer::getShape()
     return shape;
 }
 
-Link::Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti) : sourceLayer(src), targetLayer(tgt), m_activate(acti)
+Link::Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt) : sourceLayer(src), targetLayer(tgt)
 {
 }
 
@@ -114,11 +114,8 @@ const std::vector<Synapse> Link::synapses()
 {
     return m_synapses;
 }
-const std::string Link::activate()
-{
-    return m_activate;
-}
-DenseLink::DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti) : Link(src, tgt, acti)
+
+DenseLink::DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt) : Link(src, tgt)
 {
     initSynapses();
 }
@@ -127,12 +124,12 @@ void DenseLink::initSynapses()
 {
     size_t sy_sz = sourceLayer->size() * targetLayer->size();
     m_synapses.resize(sy_sz);
-    for (size_t j = 0; j < targetLayer->size(); j++)
+    for (size_t j = 0; j < targetLayer->size() - 1; j++)
     {
-        for (size_t i = 0; i < sourceLayer->size(); i++)
+        for (size_t i = 0; i < sourceLayer->size() - 1; i++)
         {
-            m_synapses.at(j + i * targetLayer->size()).fromIdx = j;
-            m_synapses.at(j + i * targetLayer->size()).toIdx = i;
+            m_synapses.at(j * sourceLayer->size() + i).fromIdx = i;
+            m_synapses.at(j * sourceLayer->size() + i).toIdx = j;
         }
     }
 }
@@ -144,44 +141,141 @@ void DenseLink::normalInitSynapses()
 
 Network::Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output)
 {
-    addLayer(input);
-    addLayer(output);
+    layers.resize(2);
+    layers.at(0) = input;
+    layers.at(1) = output;
 }
 
 bool Network::addLayer(std::shared_ptr<Layer> layer)
 {
-    auto it = std::find(links.begin(), links.end(), layer);
+    auto it = std::find(layers.begin(), layers.end(), layer);
     if (it != layers.end())
+    {
+        std::cout << "Repeatedly adding the same element" << std::endl;
         return 0;
+    }
     it = layers.end() - 1;
     layers.insert(it, layer);
+    return 1;
 }
 
-void Network::addLink(std::shared_ptr<Link> link)
+bool Network::addLink(std::shared_ptr<Link> link)
 {
-    links.push_back(link);
-}
-
-void Network::updateCache()
-{
-    for (auto l : links)
+    auto it = std::find(links.begin(), links.end(), link);
+    if (it != links.end())
     {
+        std::cout << "Repeatedly adding the same element" << std::endl;
+        return 0;
+    }
+    auto sourceIt = std::find(layers.begin(), layers.end(), link->source());
+    auto targetIt = std::find(layers.begin(), layers.end(), link->target());
+    if (sourceIt == layers.end() || targetIt == layers.end())
+    {
+        std::cout << "linking layer not obtained" << std::endl;
+        return 0;
+    }
+    links.push_back(link);
+    return 1;
+}
+
+void Network::updateForwardCache()
+{
+    std::unordered_map<std::shared_ptr<Layer>, size_t> layersIndex;
+    for (size_t i = 0; i < layers.size(); i++)
+    {
+        layersIndex.insert({layers.at(i), i});
+    }
+    forwardCache.resize(layers.size());
+    for (const auto &l : links)
+    {
+        auto it = layersIndex.find(l->source());
+        size_t idx = it->second;
+        forwardCache.at(idx).push_back(l);
     }
 }
+
+void Network::updateBackwardCache()
+{
+    std::unordered_map<std::shared_ptr<Layer>, size_t> layersIndex;
+    for (size_t i = 0; i < layers.size(); i++)
+    {
+        layersIndex.insert({layers.at(i), i});
+    }
+    backwardCache.resize(layers.size());
+    for (const auto &l : links)
+    {
+        auto it = layersIndex.find(l->target());
+        size_t idx = it->second;
+        backwardCache.at(idx).push_back(l);
+    }
+}
+
 Sample Network::predict(const Sample &sample)
 {
-    updateCache();
     if (sample.features.size() != layers.front()->size())
     {
         std::cout << "predict Error: size don't match" << std::endl;
         return Sample();
     }
+    updateForwardCache();
+    updateBackwardCache();
+    std::unordered_map<std::shared_ptr<Layer>, size_t> layersIndex;
+    std::vector<size_t> totalInputSize;
+    totalInputSize.resize(layers.size());
+    for (size_t i = 0; i < layers.size(); i++)
+    {
+        layersIndex.insert({layers.at(i), i});
+        totalInputSize.at(i) = backwardCache.at(i).size();
+    }
+    std::vector<size_t> currentInputSize;
+    currentInputSize.resize(totalInputSize.size());
     Layer &input(*layers.at(0));
     for (int i = 0; i < input.size(); i++)
     {
-        input.neurons.at(i).value = sample.features.at(i);
+        input.neurons.at(i).output = sample.features.at(i);
     }
-    notCompleteYet
+    bool complete = 0;
+    std::vector<bool> doneForward;
+    doneForward.resize(totalInputSize.size());
+    while (!complete)
+    {
+        for (int i = 0; i < currentInputSize.size() - 1; i++)
+        {
+            if (doneForward.at(i))
+                continue;
+            if (currentInputSize.at(i) != totalInputSize.at(i))
+                continue;
+            if (currentInputSize.at(i) == totalInputSize.at(i))
+            {
+                for (const auto &l : forwardCache.at(i))
+                {
+                    currentInputSize.at(layersIndex.find(l->target())->second) += 1;
+                    bool targetDoneInput = 0;
+                    if (currentInputSize.at(layersIndex.find(l->target())->second) == totalInputSize.at(layersIndex.find(l->target())->second))
+                        targetDoneInput = 1;
+                    for (const auto &s : l->synapses())
+                    {
+                        l->target()->neurons.at(s.toIdx).input += (l->source()->neurons.at(s.fromIdx).output) * (s.weight);
+                    }
+                    if (targetDoneInput)
+                        for (auto &n : l->target()->neurons)
+                        {
+                            n.output = activateFunc.find(l->target()->m_activate)->second(n.input + n.bias);
+                        }
+                }
+                doneForward.at(i) = 1;
+            }
+        }
+
+        if (currentInputSize == totalInputSize)
+            complete = 1;
+    }
+    Sample rtr = sample;
+    for (int j = 0; j < layers.back()->size(); j++)
+    {
+        rtr.labels.at(j) = layers.back()->neurons.at(j).output;
+    }
+    return rtr;
 }
 
 //
@@ -280,7 +374,6 @@ void normalInitSynapses(std::vector<Synapse> &syns)
     for (auto &s : syns)
     { // ✅ 引用！
         s.weight = dist(gen);
-        s.bias = dist(gen); // bias 通常初始化为 0，或单独处理
     }
 }
 

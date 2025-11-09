@@ -64,8 +64,10 @@ class Nueron
 {
 
 public:
-    double value = 0;
     double delta = 0;
+    double input = 0;
+    double output = 0;
+    double bias = 0;
 };
 
 class Layer
@@ -73,13 +75,14 @@ class Layer
     std::vector<Nueron> neurons;
     std::vector<size_t> shape;
     std::vector<size_t> strides;
+    std::string m_activate;
 
     void initStrides(std::vector<size_t> shp);
-    friend Network;
+    friend class Network;
 
 public:
     std::string comment;
-    Layer(std::vector<size_t> shp);
+    Layer(std::vector<size_t> shp, std::string activate = "linear");
     size_t size();
     std::vector<size_t> getShape();
 };
@@ -88,7 +91,6 @@ class Synapse
 {
 public:
     double weight;
-    double bias;
     double gradient;
     size_t fromIdx;
     size_t toIdx;
@@ -100,15 +102,13 @@ protected:
     std::shared_ptr<Layer> sourceLayer;
     std::shared_ptr<Layer> targetLayer;
     std::vector<Synapse> m_synapses;
-    std::string m_activate;
     virtual void initSynapses();
 
 public:
-    Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti = "linear");
+    Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt);
     std::shared_ptr<Layer> source();
     std::shared_ptr<Layer> target();
     const std::vector<Synapse> synapses();
-    const std::string activate();
     virtual ~Link();
 };
 
@@ -118,7 +118,7 @@ class DenseLink : public Link
     void initSynapses() override;
 
 public:
-    DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt, std::string acti = "linear");
+    DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt);
     void normalInitSynapses();
 };
 
@@ -126,14 +126,16 @@ class Network
 {
     std::vector<std::shared_ptr<Layer>> layers;
     std::vector<std::shared_ptr<Link>> links;
-    std::vector<std::pair<std::vector<std::shared_ptr<Link>>, std::vector<std::shared_ptr<Link>>>> cache;
-    void updateCache();
+    std::vector<std::vector<std::shared_ptr<Link>>> forwardCache;
+    std::vector<std::vector<std::shared_ptr<Link>>> backwardCache;
+    void updateForwardCache();
+    void updateBackwardCache();
 
 public:
     std::string comment;
     Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output);
-    void addLayer(std::shared_ptr<Layer> layer);
-    void addLink(std::shared_ptr<Link> link);
+    bool addLayer(std::shared_ptr<Layer> layer);
+    bool addLink(std::shared_ptr<Link> link);
     void saveModel(const std::string &file);
     // void loadModel(const std::string &file);
     Sample predict(const Sample &sample);
