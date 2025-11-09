@@ -126,6 +126,8 @@ class Network
 {
     std::vector<std::shared_ptr<Layer>> layers;
     std::vector<std::shared_ptr<Link>> links;
+    std::vector<std::pair<std::vector<std::shared_ptr<Link>>, std::vector<std::shared_ptr<Link>>>> cache;
+    void updateCache();
 
 public:
     std::string comment;

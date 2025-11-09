@@ -148,9 +148,12 @@ Network::Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output)
     addLayer(output);
 }
 
-void Network::addLayer(std::shared_ptr<Layer> layer)
+bool Network::addLayer(std::shared_ptr<Layer> layer)
 {
-    auto it = layers.end() - 1;
+    auto it = std::find(links.begin(), links.end(), layer);
+    if (it != layers.end())
+        return 0;
+    it = layers.end() - 1;
     layers.insert(it, layer);
 }
 
@@ -159,8 +162,15 @@ void Network::addLink(std::shared_ptr<Link> link)
     links.push_back(link);
 }
 
+void Network::updateCache()
+{
+    for (auto l : links)
+    {
+    }
+}
 Sample Network::predict(const Sample &sample)
 {
+    updateCache();
     if (sample.features.size() != layers.front()->size())
     {
         std::cout << "predict Error: size don't match" << std::endl;
