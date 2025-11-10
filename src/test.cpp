@@ -1,7 +1,7 @@
-#pragma once
+
+#include "test.h"
 #include "net.h"
 #include <iostream>
-
 void testLoadSample()
 {
     SampleSet smpSet(256, 10);
@@ -29,14 +29,16 @@ void testSavingModel()
 
 void testPredict()
 {
-    auto in = std::make_shared<Layer>(std::vector<size_t>({2, 2}));
+    auto in = std::make_shared<Layer>(std::vector<size_t>({1, 5}));
     auto out = std::make_shared<Layer>(std::vector<size_t>({1}));
     auto hid = std::make_shared<Layer>(std::vector<size_t>({3, 3}));
 
     auto in2hid = std::make_shared<DenseLink>(in, hid);
-    in2hid->normalInitSynapses();
+    // in2hid->normalInitSynapses();
+    in2hid->valueInitSynapses(1);
     auto hid2out = std::make_shared<DenseLink>(hid, out);
-    hid2out->normalInitSynapses();
+    // hid2out->normalInitSynapses();
+    hid2out->valueInitSynapses(1);
 
     Network net(in, out);
     net.addLayer(hid);
@@ -44,8 +46,8 @@ void testPredict()
     net.addLink(hid2out);
 
     Sample inputSample;
-    inputSample.features.resize(4);
-    inputSample.features = {1, 1, 1, 1};
+    inputSample.features.resize(5);
+    inputSample.features = {1, 1, 1, 1, 1};
     inputSample.labels.resize(1);
 
     Sample outputSample = net.predict(inputSample);

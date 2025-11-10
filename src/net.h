@@ -1,4 +1,5 @@
 #pragma once
+
 #include <vector>
 #include <string>
 #include <random>
@@ -120,6 +121,7 @@ class DenseLink : public Link
 public:
     DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt);
     void normalInitSynapses();
+    void valueInitSynapses(double value);
 };
 
 class Network
@@ -141,7 +143,9 @@ public:
     Sample predict(const Sample &sample);
 };
 
-void normalInitSynapses(std::vector<Synapse> &syns);
+void normalInitSynapses(std::vector<Synapse> &synapses);
+
+void valueInitSynapses(std::vector<Synapse> &synapses, double value);
 
 bool loadSamples(std::string path, SampleSet &samples);
 

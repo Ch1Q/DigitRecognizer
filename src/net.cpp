@@ -124,9 +124,9 @@ void DenseLink::initSynapses()
 {
     size_t sy_sz = sourceLayer->size() * targetLayer->size();
     m_synapses.resize(sy_sz);
-    for (size_t j = 0; j < targetLayer->size() - 1; j++)
+    for (size_t j = 0; j < targetLayer->size(); j++)
     {
-        for (size_t i = 0; i < sourceLayer->size() - 1; i++)
+        for (size_t i = 0; i < sourceLayer->size(); i++)
         {
             m_synapses.at(j * sourceLayer->size() + i).fromIdx = i;
             m_synapses.at(j * sourceLayer->size() + i).toIdx = j;
@@ -137,6 +137,11 @@ void DenseLink::initSynapses()
 void DenseLink::normalInitSynapses()
 {
     ::normalInitSynapses(m_synapses);
+}
+
+void DenseLink::valueInitSynapses(double value)
+{
+    ::valueInitSynapses(m_synapses, value);
 }
 
 Network::Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output)
@@ -365,15 +370,23 @@ Sample Network::predict(const Sample &sample)
 
 */
 
-void normalInitSynapses(std::vector<Synapse> &syns)
+void normalInitSynapses(std::vector<Synapse> &synapses)
 {
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::normal_distribution<double> dist(0.0, 1.0);
 
-    for (auto &s : syns)
+    for (auto &s : synapses)
     { // ✅ 引用！
         s.weight = dist(gen);
+    }
+}
+
+void valueInitSynapses(std::vector<Synapse> &synapses, double value)
+{
+    for (auto &s : synapses)
+    {
+        s.weight = value;
     }
 }
 

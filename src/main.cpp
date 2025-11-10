@@ -1,6 +1,5 @@
-#include "net.h"
-#include "test.cpp"
 
+#include "test.h"
 int main()
 {
     testPredict();
