@@ -2,6 +2,7 @@
 #include "test.h"
 #include "net.h"
 #include <iostream>
+
 void testLoadSample()
 {
     SampleSet smpSet(256, 10);

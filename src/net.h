@@ -19,24 +19,6 @@ struct FileHeader
 };
 #pragma pack(pop) // 恢复默认对齐
 
-double sigmoid(double x);
-
-double sigmoidDeri(double x);
-
-double linear(double x);
-
-double linearDeri(double x);
-
-const std::unordered_map<std::string, std::function<double(double)>> activateFunc =
-    {
-        {"sigmoid", sigmoid},
-        {"linear", linear}};
-
-const std::unordered_map<std::string, std::function<double(double)>> activateDeriFunc =
-    {
-        {"sigmoidDeri", sigmoidDeri},
-        {"linearDeri", linearDeri}};
-
 struct Sample
 {
     std::vector<double> features;
@@ -47,6 +29,7 @@ class SampleSet
 {
 
     std::vector<Sample> samples;
+    friend Network;
 
 public:
     SampleSet(size_t featureSize_, size_t labelSize_);
@@ -59,94 +42,111 @@ public:
     const Sample at(size_t);
     const size_t featureSize;
     const size_t labelSize;
+    std::vector<Sample> getSamples();
 };
 
-class Nueron
+class Network
 {
 
-public:
-    double delta = 0;
-    double input = 0;
-    double output = 0;
-    double bias = 0;
-};
+    class Layer;
 
-class Layer
-{
-    std::vector<Nueron> neurons;
-    std::vector<size_t> shape;
-    std::vector<size_t> strides;
-    std::string m_activate;
+    class Link;
 
-    void initStrides(std::vector<size_t> shp);
-    friend class Network;
+    class DenseLink;
+
+    std::vector<Layer> m_layers;
+    std::vector<Link> m_links;
+    std::vector<std::vector<size_t>> m_forwardCache;
+    std::vector<std::vector<size_t>> m_backwardCache;
+    void updateForwardCache();
+    void clearForwardCache();
+    void updateBackwardCache();
+    void clearBackwardCache();
+    friend Link;
 
 public:
     std::string comment;
-    Layer(std::vector<size_t> shp, std::string activate = "linear");
-    size_t size();
-    std::vector<size_t> getShape();
+    Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output);
+    Network(std::string path);
+    // void saveModel(const std::string &file);
+    Sample predict(const Sample &sample);
+    bool train(const SampleSet &sampleSet);
+    void printLayersInfo();
+    void printLinksInfo();
 };
 
-class Synapse
+static double sigmoid(double x);
+
+static double sigmoidDeri(double x);
+
+static double linear(double x);
+
+static double linearDeri(double x);
+
+const std::unordered_map<std::string, std::function<double(double)>> activateFunc =
+    {
+        {"sigmoid", sigmoid},
+        {"linear", linear}};
+
+const std::unordered_map<std::string, std::function<double(double)>> activateDeriFunc =
+    {
+        {"sigmoidDeri", sigmoidDeri},
+        {"linearDeri", linearDeri}};
+
+class Network::Layer
 {
+    struct Nueron
+    {
+        double delta = 0;
+        double input = 0;
+        double output = 0;
+        double bias = 0;
+    };
+
+    std::vector<Nueron> m_neurons;
+    std::vector<size_t> m_shape;
+    std::vector<size_t> m_strides;
+    std::string m_activate;
+    void initStrides();
+    friend Network::Link;
+
 public:
-    double weight;
-    double gradient;
-    size_t fromIdx;
-    size_t toIdx;
+    Layer(std::vector<size_t> shape, std::string activate = "linear");
+    const size_t &size();
+    const std::vector<size_t> &shape();
+    std::string comment;
 };
 
-class Link
+class Network::Link
 {
+    struct Synapse
+    {
+        double weight;
+        double gradient;
+        size_t fromIdx;
+        size_t toIdx;
+    };
+
 protected:
-    std::shared_ptr<Layer> sourceLayer;
-    std::shared_ptr<Layer> targetLayer;
+    size_t m_source;
+    size_t m_target;
     std::vector<Synapse> m_synapses;
     virtual void initSynapses();
 
 public:
-    Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt);
-    std::shared_ptr<Layer> source();
-    std::shared_ptr<Layer> target();
-    const std::vector<Synapse> synapses();
+    Link(size_t source, size_t target);
+    const size_t &source();
+    const size_t &target();
     virtual ~Link();
 };
 
-class DenseLink : public Link
+class Network::DenseLink : public Link
 {
 
     void initSynapses() override;
 
 public:
-    DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt);
+    DenseLink(size_t source, size_t target);
     void normalInitSynapses();
     void valueInitSynapses(double value);
 };
-
-class Network
-{
-    std::vector<std::shared_ptr<Layer>> layers;
-    std::vector<std::shared_ptr<Link>> links;
-    std::vector<std::vector<std::shared_ptr<Link>>> forwardCache;
-    std::vector<std::vector<std::shared_ptr<Link>>> backwardCache;
-    void updateForwardCache();
-    void updateBackwardCache();
-
-public:
-    std::string comment;
-    Network(std::shared_ptr<Layer> input, std::shared_ptr<Layer> output);
-    bool addLayer(std::shared_ptr<Layer> layer);
-    bool addLink(std::shared_ptr<Link> link);
-    void saveModel(const std::string &file);
-    // void loadModel(const std::string &file);
-    Sample predict(const Sample &sample);
-};
-
-void normalInitSynapses(std::vector<Synapse> &synapses);
-
-void valueInitSynapses(std::vector<Synapse> &synapses, double value);
-
-bool loadSamples(std::string path, SampleSet &samples);
-
-void printSampleSet(SampleSet sampleSet);

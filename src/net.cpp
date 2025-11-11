@@ -58,72 +58,72 @@ const Sample SampleSet::at(size_t size)
     return samples.at(size);
 }
 
-void Layer::initStrides(std::vector<size_t> shp)
+std::vector<Sample> SampleSet::getSamples()
 {
-    size_t sz = shape.size();
-    strides.resize(sz);
-    strides.back() = 1;
+    return samples;
+}
+
+void Network::Layer::initStrides()
+{
+    size_t sz = m_shape.size();
+    m_strides.resize(sz);
+    m_strides.back() = 1;
     for (int i = 1; i < sz; i++)
     {
-        strides[sz - i - 1] = strides[sz - i] * shape[sz - i];
+        m_strides[sz - i - 1] = m_strides[sz - i] * m_shape[sz - i];
     }
 }
 
-Layer::Layer(std::vector<size_t> shp, std::string activate) : m_activate(activate)
+Network::Layer::Layer(std::vector<size_t> shape, std::string activate) : m_activate(activate)
 {
-    shape = shp;
-    initStrides(shp);
-    size_t nr_sz = std::accumulate(shp.begin(), shp.end(), 1ULL, [](size_t a, size_t b)
+    m_shape = shape;
+    initStrides();
+    size_t nr_sz = std::accumulate(m_shape.begin(), m_shape.end(), 1ULL, [](size_t a, size_t b)
                                    { return a * b; });
-    neurons.resize(nr_sz);
+    m_neurons.resize(nr_sz);
 }
 
-size_t Layer::size()
+const size_t &Network::Layer::size()
 {
-    return neurons.size();
+    return m_neurons.size();
 }
 
-std::vector<size_t> Layer::getShape()
+const std::vector<size_t> &Network::Layer::shape()
 {
-    return shape;
+    return m_shape;
 }
 
-Link::Link(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt) : sourceLayer(src), targetLayer(tgt)
-{
-}
-
-Link::~Link()
+Network::Link::Link(size_t source, size_t target) : m_source(source), m_target(target)
 {
 }
 
-void Link::initSynapses()
+Network::Link::~Link()
 {
 }
 
-std::shared_ptr<Layer> Link::source()
+void Network::Link::initSynapses()
 {
-    return sourceLayer;
 }
 
-std::shared_ptr<Layer> Link::target()
+const size_t &Network::Link::source()
 {
-    return targetLayer;
+    return m_source;
 }
 
-const std::vector<Synapse> Link::synapses()
+const size_t &Network::Link::target()
 {
-    return m_synapses;
+    return m_target;
 }
 
-DenseLink::DenseLink(std::shared_ptr<Layer> src, std::shared_ptr<Layer> tgt) : Link(src, tgt)
+Network::DenseLink::DenseLink(size_t source, size_t target) : Link(source, target)
 {
     initSynapses();
 }
 
-void DenseLink::initSynapses()
+void Network::DenseLink::initSynapses()
 {
-    size_t sy_sz = sourceLayer->size() * targetLayer->size();
-    m_synapses.resize(sy_sz);
+    size_t sy_sz = m_layers.at
+                       m_synapses.resize(sy_sz);
     for (size_t j = 0; j < targetLayer->size(); j++)
     {
         for (size_t i = 0; i < sourceLayer->size(); i++)
@@ -134,12 +134,12 @@ void DenseLink::initSynapses()
     }
 }
 
-void DenseLink::normalInitSynapses()
+void Network::DenseLink::normalInitSynapses()
 {
-    ::normalInitSynapses(m_synapses);
+    normalInitSynapses(m_synapses);
 }
 
-void DenseLink::valueInitSynapses(double value)
+void Network::DenseLink::valueInitSynapses(double value)
 {
     ::valueInitSynapses(m_synapses, value);
 }
@@ -283,6 +283,17 @@ Sample Network::predict(const Sample &sample)
     return rtr;
 }
 
+bool Network::train(const SampleSet &sampleSet)
+{
+    if (sampleSet.featureSize != layers.front()->size() || sampleSet.labelSize != layers.back()->size())
+    {
+        std::cout << "sampleSet size does't match the network" << std::endl;
+        return 0;
+    }
+    updateForwardCache();
+    updateBackwardCache();
+}
+
 //
 //
 //
@@ -370,7 +381,7 @@ Sample Network::predict(const Sample &sample)
 
 */
 
-void normalInitSynapses(std::vector<Synapse> &synapses)
+void Network::normalInitSynapses(std::vector<Synapse> &synapses)
 {
     static std::random_device rd;
     static std::mt19937 gen(rd());
@@ -382,7 +393,7 @@ void normalInitSynapses(std::vector<Synapse> &synapses)
     }
 }
 
-void valueInitSynapses(std::vector<Synapse> &synapses, double value)
+void Network::valueInitSynapses(std::vector<Synapse> &synapses, double value)
 {
     for (auto &s : synapses)
     {
@@ -539,22 +550,22 @@ void printSampleSet(SampleSet sampleSet)
     }
 }
 
-double sigmoid(double x)
+double Network::sigmoid(double x)
 {
     return 1.0 / (1.0 + std::exp(-x));
 }
 
-double sigmoidDeri(double x)
+double Network::sigmoidDeri(double x)
 {
     return x * (1.0 - 1.0 / (1.0 + std::exp(-x)));
 }
 
-double linear(double x)
+double Network::linear(double x)
 {
     return x;
 }
 
-double linearDeri(double x)
+double Network::linearDeri(double x)
 {
     return 0;
 }
